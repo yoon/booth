@@ -1,71 +1,63 @@
 #!/usr/bin/env ruby
-
 require 'rubygems'
 require 'RMagick'
 include Magick
 
+# Creates a composite from four photos
+# [ A ] [  B ] [  C ] [  D ]
+# gapimagegapimagegapimagega
+# [ A ] [  B ] [  C ] [  D ]
+ 
 class BoothPhoto
+  IMAGE_SIZE      = [524, 349] # width, height, in pixels
+  COMPOSITE_SIZE  = [2400, 1200] # columns, rows, in pixels
+  BORDER          = 38 # 76 pixels total, bringing image to 425x600 or (1.43in x 2in @300dpi)
+  GAP_HEIGHT      = 350
   
-  IMAGES_ROWS = 2
-  BORDER = 5
-  GAP=0.25
-
-  attr_reader :row_height, :total_columns
-  
-  def initialize(photo_uris = [])
-    collect_photos(photo_uris)  
-	@gap_actual = row_height * IMAGES_ROWS * GAP
-    # Making the composite image to fit all the photos
-    @comp = Image.new(total_columns,(row_height*IMAGES_ROWS)+@gap_actual)
+  def initialize(paths = [])
+    @photos = []
+    @comp = Image.new( COMPOSITE_SIZE )
+    
+    collect_photos( paths )
     add_photos_to_composite
   end
 
   def grayscale!
     @comp = @comp.quantize(256,GRAYColorspace)
   end
- 
-  def display
-    @comp.display   
-  end
-
   def oil_paint!
     @comp = @comp.oil_paint(1.0)
   end
-  
   def sepia!
     @comp = @comp.sepiatone()
   end
-
+  def display
+    @comp.display   
+  end
   def save(file_name)
     @comp.write(file_name)
   end
 
   private
-  def collect_photos(photo_uris)
-    @photos = []
-    @total_columns = 0
-    @row_height = 0
-    photo_uris.each do |path|
-      photo = ImageList.new(path)
-	  photo.thumbnail!(0.50)
-      photo.border!(BORDER, BORDER, "#f0f0ff") #Adding border
-      @total_columns += photo.columns
-      if photo.rows > @row_height
-        @row_height = photo.rows # Getting the maxheight for the row
-      end
-      @photos << photo
+  
+  def collect_photos(paths)
+    paths.each do |path|
+      @photos << ImageList.new(path).thumbnail!(IMAGE_SIZE).border!(BORDER, BORDER, "#f0f0ff")
     end
-
   end
 
   def add_photos_to_composite
-    IMAGES_ROWS.times do |t_row|
-      offset = 0
-      @photos.each do |photo|
-        @comp.composite!(photo,NorthWestGravity,offset,(@row_height*t_row)+(t_row*@gap_actual),AtopCompositeOp)
-        offset += photo.columns
-      end
-    end
+    add_row(0)
+    add_gap
+    add_row(IMAGE_SIZE[1] + (BORDER * 2) + GAP_HEIGHT)
+  end
+  
+  def add_row(y_offset)
+    offset = 0
+    @photos.each do |photo|
+      @comp.composite!( photo, NorthWestGravity , offset , y_offset, AtopCompositeOp )
+      offset += photo.columns
+    end 
   end
 
 end
